@@ -1,0 +1,51 @@
+# One command: Ollama, a one-shot model download, and the assistant.
+#   docker compose up -d            (CPU)
+#   docker compose -f compose.yaml -f compose.gpu.yaml up -d   (NVIDIA GPU)
+
+x-models: &models
+  CHAT_MODEL: ${CHAT_MODEL:-qwen2.5:7b}
+  EMBED_MODEL: ${EMBED_MODEL:-bge-m3}
+
+services:
+  ollama:
+    image: ollama/ollama:0.40.15
+    environment:
+      # Keep both the chat and the embedding model resident; reloading one costs seconds per question.
+      OLLAMA_MAX_LOADED_MODELS: "2"
+      OLLAMA_KEEP_ALIVE: "30m"
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      retries: 20
+
+  models:
+    image: ollama/ollama:0.40.15
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      <<: *models
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull \"$$EMBED_MODEL\" && ollama pull \"$$CHAT_MODEL\""]
+    restart: "no"
+
+  app:
+    build: .
+    image: local-rag-assistant
+    depends_on:
+      models:
+        condition: service_completed_successfully
+    environment:
+      <<: *models
+      OLLAMA_URL: http://ollama:11434
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./documents:/app/documents
+      - index:/app/index
+
+volumes:
+  ollama:
+  index:

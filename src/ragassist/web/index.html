@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document Assistant</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1f1e1c; --muted: #6b675f; --line: #e4e1da;
+    --accent: #2f6fde; --accent-soft: #e8effc; --user: #1f1e1c; --user-ink: #ffffff;
+    --good: #16833a; --warn: #b7791f; --bad: #c2362f;
+    --radius: 12px; --mono: ui-monospace, "SF Mono", Consolas, monospace;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1c1b1a; --ink: #ecebe8; --muted: #9a968e; --line: #2c2b29;
+      --accent: #6b9bf0; --accent-soft: #1f2a3d; --user: #ecebe8; --user-ink: #141413;
+      --good: #4cc274; --warn: #e0a83e; --bad: #ef6b63;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); height: 100vh; display: grid; grid-template-columns: 260px 1fr 360px; }
+  aside, section { min-height: 0; }
+  .side { border-right: 1px solid var(--line); padding: 20px 16px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: .01em; }
+  .brand small { display: block; color: var(--muted); font-weight: 400; margin-top: 4px; font-size: 12px; }
+  h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .status { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
+  .status div { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--good); } .dot.wait { background: var(--warn); } .dot.bad { background: var(--bad); }
+  .docs { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; }
+  .docs li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; min-width: 0; }
+  .docs li:hover { background: var(--panel); }
+  .docs span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .docs span:last-child { color: var(--muted); font-family: var(--mono); font-size: 11px; flex: none; }
+  .upload { border: 1px dashed var(--line); border-radius: var(--radius); padding: 14px; text-align: center; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .upload:hover, .upload.drag { border-color: var(--accent); color: var(--accent); }
+  .chat { display: flex; flex-direction: column; min-width: 0; }
+  .log { flex: 1; overflow-y: auto; padding: 32px max(24px, calc((100% - 760px) / 2)); display: flex; flex-direction: column; gap: 22px; }
+  .empty { margin: auto; text-align: center; color: var(--muted); max-width: 440px; }
+  .empty h1 { color: var(--ink); font-size: 22px; margin: 0 0 8px; }
+  .examples { display: grid; gap: 8px; margin-top: 18px; }
+  .examples button { text-align: left; background: var(--panel); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .examples button:hover { border-color: var(--accent); }
+  .msg { max-width: 100%; line-height: 1.6; font-size: 15px; }
+  .msg.user { align-self: flex-end; background: var(--user); color: var(--user-ink); padding: 10px 14px; border-radius: 16px 16px 4px 16px; max-width: 80%; }
+  .msg.bot p { margin: 0 0 10px; } .msg.bot ul { margin: 0 0 10px; padding-left: 20px; }
+  .cite { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 5px; margin: 0 1px; border-radius: 9px; border: 0; background: var(--accent-soft); color: var(--accent); font: 600 11px var(--mono); cursor: pointer; vertical-align: 2px; }
+  .cite:hover, .cite.on { background: var(--accent); color: #fff; }
+  .meta { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 6px; }
+  .error { color: var(--bad); font-size: 14px; }
+  .cursor::after { content: ""; display: inline-block; width: 7px; height: 15px; background: var(--ink); margin-left: 2px; vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  form { padding: 16px max(24px, calc((100% - 760px) / 2)) 24px; }
+  .box { display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 8px 8px 16px; }
+  .box:focus-within { border-color: var(--accent); }
+  textarea { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: inherit; font-size: 15px; line-height: 1.5; padding: 6px 0; max-height: 160px; }
+  .send { border: 0; border-radius: 10px; background: var(--ink); color: var(--bg); padding: 0 16px; font: 600 14px inherit; cursor: pointer; }
+  .send:disabled { opacity: .35; cursor: default; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
+  .sources { border-left: 1px solid var(--line); padding: 20px 16px; overflow-y: auto; }
+  .source { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; font-size: 13px; transition: border-color .2s, box-shadow .2s; }
+  .source.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .source.unused { opacity: .55; }
+  .source header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+  .source header b { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+  .source header span { font-weight: 600; overflow-wrap: anywhere; }
+  .source p { margin: 0; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+  .source.on p { -webkit-line-clamp: unset; }
+  .placeholder { color: var(--muted); font-size: 13px; }
+  @media (max-width: 1100px) { body { grid-template-columns: 220px 1fr; } .sources { display: none; } }
+  @media (max-width: 720px) { body { grid-template-columns: 1fr; } .side { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .cursor::after { animation: none; } }
+</style>
+</head>
+<body>
+<aside class="side">
+  <div class="brand">Document Assistant<small>Answers from your files, cited. Runs locally.</small></div>
+  <div><h3>Status</h3><div class="status" id="status"><div><i class="dot wait"></i>Connecting…</div></div></div>
+  <div><h3>Documents</h3><ul class="docs" id="docs"></ul></div>
+  <label class="upload" id="drop"><span id="drop-text">Drop a PDF, XLSX, MD or TXT here, or click to add</span><input type="file" id="file" hidden accept=".pdf,.xlsx,.md,.txt"></label>
+</aside>
+
+<section class="chat">
+  <div class="log" id="log">
+    <div class="empty" id="empty">
+      <h1>Ask your documents</h1>
+      <div>Every answer cites the file and page it came from. Click a citation to read the passage.</div>
+      <div class="examples" id="examples"></div>
+    </div>
+  </div>
+  <form id="form">
+    <div class="box">
+      <textarea id="q" rows="1" placeholder="Ask a question in Turkish or English…" aria-label="Question"></textarea>
+      <button class="send" id="send" disabled>Ask</button>
+    </div>
+    <div class="hint">Enter to send, Shift+Enter for a new line. Follow-up questions keep the last 3 turns of context.</div>
+  </form>
+</section>
+
+<aside class="sources" id="sources"><h3>Sources</h3><div class="placeholder">Passages used for the latest answer appear here.</div></aside>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const EXAMPLES = [
+  "ESD bilekliğinin direnci ne kadar olmalı?",
+  "Which open actions are assigned to the purchasing team?",
+  "What does the FDA guidance say about corrective and preventive action?",
+  "Tedarikçi denetimleri ne sıklıkla yapılır?",
+];
+const history = [];
+let busy = false;
+
+const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+function render(text) {
+  // Minimal, safe markdown: paragraphs, bullet lists, bold, and [n] citations.
+  const html = escapeHtml(text).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const blocks = html.split(/\n{2,}/).map((block) => {
+    const lines = block.split("\n");
+    if (lines.every((l) => /^\s*([-*•]|\d+\.)\s+/.test(l))) {
+      return "<ul>" + lines.map((l) => "<li>" + l.replace(/^\s*([-*•]|\d+\.)\s+/, "") + "</li>").join("") + "</ul>";
+    }
+    return "<p>" + lines.join("<br>") + "</p>";
+  });
+  return blocks.join("").replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_, group) =>
+    group.split(",").map((n) => `<button class="cite" data-n="${n.trim()}">${n.trim()}</button>`).join(""));
+}
+
+function showSources(sources, cited = null) {
+  const box = $("sources");
+  box.innerHTML = "<h3>Sources</h3>";
+  if (!sources.length) {
+    box.insertAdjacentHTML("beforeend", '<div class="placeholder">No passage matched this question.</div>');
+    return;
+  }
+  for (const s of sources) {
+    const unused = cited && !cited.includes(s.n) ? " unused" : "";
+    box.insertAdjacentHTML("beforeend",
+      `<article class="source${unused}" id="src-${s.n}"><header><b>[${s.n}]</b><span>${escapeHtml(s.citation)}</span></header><p>${escapeHtml(s.text)}</p></article>`);
+  }
+}
+
+function focusSource(n) {
+  document.querySelectorAll(".source.on, .cite.on").forEach((el) => el.classList.remove("on"));
+  const el = $("src-" + n);
+  if (el) { el.classList.add("on"); el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  document.querySelectorAll(`.cite[data-n="${n}"]`).forEach((el) => el.classList.add("on"));
+}
+
+$("log").addEventListener("click", (e) => { const b = e.target.closest(".cite"); if (b) focusSource(b.dataset.n); });
+
+function addMessage(cls, html) {
+  $("empty")?.remove();
+  const el = document.createElement("div");
+  el.className = "msg " + cls;
+  el.innerHTML = html;
+  $("log").appendChild(el);
+  $("log").scrollTop = $("log").scrollHeight;
+  return el;
+}
+
+async function ask(question) {
+  if (busy || !question.trim()) return;
+  busy = true; $("send").disabled = true;
+  addMessage("user", escapeHtml(question));
+  const bot = addMessage("bot cursor", "");
+  let text = "", sources = [];
+  try {
+    const resp = await fetch("/api/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, history: history.slice(-3) }),
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let cut;
+      while ((cut = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, cut); buffer = buffer.slice(cut + 2);
+        const event = raw.match(/^event: (.*)$/m)?.[1];
+        const data = JSON.parse(raw.match(/^data: (.*)$/m)?.[1] ?? "null");
+        if (event === "sources") { sources = data; showSources(sources); }
+        if (event === "token") { text += data; bot.innerHTML = render(text); $("log").scrollTop = $("log").scrollHeight; }
+        if (event === "error") { bot.innerHTML = `<div class="error">${escapeHtml(data)}</div>`; }
+        if (event === "done") {
+          showSources(sources, data.cited);
+          const t = data.timings;
+          bot.insertAdjacentHTML("beforeend", `<div class="meta">${data.cited.length} of ${sources.length} sources cited · retrieval ${Math.round(t.retrieve_ms - (t.rewrite_ms || 0))} ms · first token ${Math.round(t.first_token_ms)} ms · total ${(t.total_ms / 1000).toFixed(1)} s</div>`);
+          history.push({ question, answer: text });
+        }
+      }
+    }
+  } catch (err) {
+    bot.innerHTML = `<div class="error">Request failed: ${escapeHtml(String(err))}</div>`;
+  } finally {
+    bot.classList.remove("cursor");
+    busy = false; $("send").disabled = !$("q").value.trim();
+  }
+}
+
+$("form").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value; $("q").value = ""; resize(); ask(q); });
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); } });
+const resize = () => { const t = $("q"); t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; $("send").disabled = busy || !t.value.trim(); };
+$("q").addEventListener("input", resize);
+
+for (const q of EXAMPLES) {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = q; b.onclick = () => ask(q);
+  $("examples").appendChild(b);
+}
+
+async function refresh() {
+  try {
+    const [health, docs] = await Promise.all([fetch("/api/health").then((r) => r.json()), fetch("/api/documents").then((r) => r.json())]);
+    const models = Object.entries(health.models).map(([name, ok]) => `<div><i class="dot ${ok ? "ok" : "bad"}"></i>${escapeHtml(name)}</div>`).join("");
+    const index = health.syncing ? '<div><i class="dot wait"></i>Indexing…</div>' : `<div><i class="dot ok"></i>${health.chunks.toLocaleString()} passages indexed</div>`;
+    $("status").innerHTML = models + index;
+    $("docs").innerHTML = docs.map((d) => `<li title="${escapeHtml(d.name)}"><span>${escapeHtml(d.name)}</span><span>${d.chunks}</span></li>`).join("");
+  } catch {
+    $("status").innerHTML = '<div><i class="dot bad"></i>Server unreachable</div>';
+  }
+}
+refresh(); setInterval(refresh, 5000);
+
+async function upload(file) {
+  const form = new FormData(); form.append("file", file);
+  $("drop-text").textContent = `Indexing ${file.name}…`;
+  const resp = await fetch("/api/documents", { method: "POST", body: form });
+  $("drop-text").textContent = resp.ok ? `Added ${file.name}` : `Could not add ${file.name}`;
+  refresh();
+}
+$("file").addEventListener("change", (e) => e.target.files[0] && upload(e.target.files[0]));
+const drop = $("drop");
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drag"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("drag"); e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]); });
+</script>
+</body>
+</html>

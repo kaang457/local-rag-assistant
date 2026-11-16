@@ -1,0 +1,8 @@
+# Runtime dependencies, pinned. Ranges live in pyproject.toml.
+fastapi==0.163.1
+httpx==0.28.1
+numpy==2.5.5
+openpyxl==3.1.5
+pypdf==7.1.0
+python-multipart==0.0.33
+uvicorn==0.54.0

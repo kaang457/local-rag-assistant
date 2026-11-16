@@ -1,0 +1,9 @@
+.git
+.github
+.venv
+env
+index
+**/__pycache__
+.pytest_cache
+.ruff_cache
+compose.override.yaml

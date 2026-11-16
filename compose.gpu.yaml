@@ -1,0 +1,10 @@
+# Adds an NVIDIA GPU to Ollama. Needs the NVIDIA Container Toolkit (Linux) or Docker Desktop with WSL 2 (Windows).
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
